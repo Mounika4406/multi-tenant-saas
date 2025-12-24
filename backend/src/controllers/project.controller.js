@@ -232,5 +232,70 @@ export const updateProject = async (req, res) => {
     });
   }
 };
+export const deleteProject = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { projectId } = req.params;
+    const { tenantId, userId, role } = req.user;
+
+    const projectResult = await pool.query(
+      "SELECT tenant_id, created_by FROM projects WHERE id = $1",
+      [projectId]
+    );
+
+    if (projectResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found",
+      });
+    }
+
+    const project = projectResult.rows[0];
+
+    if (project.tenant_id !== tenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access",
+      });
+    }
+
+    if (role !== "tenant_admin" && project.created_by !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not allowed to delete this project",
+      });
+    }
+
+    // Delete tasks under this project
+    await pool.query(
+      "DELETE FROM tasks WHERE project_id = $1",
+      [projectId]
+    );
+
+    // Delete project
+    await pool.query(
+      "DELETE FROM projects WHERE id = $1",
+      [projectId]
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Project deleted successfully",
+    });
+  } catch (error) {
+    console.error("DELETE PROJECT ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete project",
+    });
+  }
+};
+
 
 
