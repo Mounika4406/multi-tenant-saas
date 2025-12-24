@@ -369,3 +369,49 @@ export const updateTask = async (req, res) => {
     });
   }
 };
+export const deleteTask = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const { taskId } = req.params;
+    const { tenantId } = req.user;
+
+    // Verify task belongs to tenant
+    const taskResult = await pool.query(
+      "SELECT tenant_id FROM tasks WHERE id = $1",
+      [taskId]
+    );
+
+    if (taskResult.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    if (taskResult.rows[0].tenant_id !== tenantId) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized access",
+      });
+    }
+
+    await pool.query("DELETE FROM tasks WHERE id = $1", [taskId]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Task deleted successfully",
+    });
+  } catch (error) {
+    console.error("DELETE TASK ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete task",
+    });
+  }
+};
